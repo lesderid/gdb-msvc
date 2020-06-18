@@ -2466,9 +2466,9 @@ bfd_demangle (bfd *abfd, const char *name, int options)
     ++name;
   pre_len = name - pre;
 
-  /* Strip off @plt and suchlike too.  */
+  /* Strip off @plt too.  */
   alloc = NULL;
-  suf = strchr (name, '@');
+  suf = strstr (name, "@plt");
   if (suf != NULL)
     {
       alloc = (char *) bfd_malloc (suf - name + 1);

@@ -57,9 +57,10 @@ extern "C" {
 #define DMGL_GNAT	 (1 << 15)
 #define DMGL_DLANG	 (1 << 16)
 #define DMGL_RUST	 (1 << 17)	/* Rust wraps GNU_V3 style mangling.  */
+#define DMGL_MSVC	 (1 << 30)
 
 /* If none of these are set, use 'current_demangling_style' as the default. */
-#define DMGL_STYLE_MASK (DMGL_AUTO|DMGL_GNU_V3|DMGL_JAVA|DMGL_GNAT|DMGL_DLANG|DMGL_RUST)
+#define DMGL_STYLE_MASK (DMGL_AUTO|DMGL_GNU_V3|DMGL_JAVA|DMGL_GNAT|DMGL_DLANG|DMGL_RUST|DMGL_MSVC)
 
 /* Disable a limit on the depth of recursion in mangled strings.
    Note if this limit is disabled then stack exhaustion is possible when
@@ -89,7 +90,8 @@ extern enum demangling_styles
   java_demangling = DMGL_JAVA,
   gnat_demangling = DMGL_GNAT,
   dlang_demangling = DMGL_DLANG,
-  rust_demangling = DMGL_RUST
+  rust_demangling = DMGL_RUST,
+  msvc_demangling = DMGL_MSVC
 } current_demangling_style;
 
 /* Define string names for the various demangling styles. */
@@ -101,6 +103,7 @@ extern enum demangling_styles
 #define GNAT_DEMANGLING_STYLE_STRING          "gnat"
 #define DLANG_DEMANGLING_STYLE_STRING         "dlang"
 #define RUST_DEMANGLING_STYLE_STRING          "rust"
+#define MSVC_DEMANGLING_STYLE_STRING          "msvc"
 
 /* Some macros to test what demangling style is active. */
 
@@ -111,6 +114,7 @@ extern enum demangling_styles
 #define GNAT_DEMANGLING (((int) CURRENT_DEMANGLING_STYLE) & DMGL_GNAT)
 #define DLANG_DEMANGLING (((int) CURRENT_DEMANGLING_STYLE) & DMGL_DLANG)
 #define RUST_DEMANGLING (((int) CURRENT_DEMANGLING_STYLE) & DMGL_RUST)
+#define MSVC_DEMANGLING (((int) CURRENT_DEMANGLING_STYLE) & DMGL_MSVC)
 
 /* Provide information about the available demangle styles. This code is
    pulled from gdb into libiberty because it is useful to binutils also.  */
@@ -179,6 +183,9 @@ rust_demangle_sym (char *sym);
    RUST_DEMANGLE_SYM.  Returns a new string that is owned by the caller.  */
 extern char *
 rust_demangle (const char *mangled, int options);
+
+extern char*
+msvc_demangle(const char* mangled, int options);
 
 enum gnu_v3_ctor_kinds {
   gnu_v3_complete_object_ctor = 1,

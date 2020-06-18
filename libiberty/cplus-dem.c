@@ -53,6 +53,7 @@ void * realloc ();
 
 #include "libiberty.h"
 #include "rust-demangle.h"
+#include "msvc-demangle.h"
 
 enum demangling_styles current_demangling_style = auto_demangling;
 
@@ -98,6 +99,12 @@ const struct demangler_engine libiberty_demanglers[] =
     RUST_DEMANGLING_STYLE_STRING,
     rust_demangling,
     "Rust style demangling"
+  }
+  ,
+  {
+    MSVC_DEMANGLING_STYLE_STRING,
+    msvc_demangling,
+    "MSVC style demangling"
   }
   ,
   {
@@ -161,8 +168,12 @@ cplus_demangle (const char *mangled, int options)
     options |= (int) current_demangling_style & DMGL_STYLE_MASK;
 
   /* The V3 ABI demangling is implemented elsewhere.  */
-  if (GNU_V3_DEMANGLING || RUST_DEMANGLING || AUTO_DEMANGLING)
+  if (GNU_V3_DEMANGLING || RUST_DEMANGLING || MSVC_DEMANGLING || AUTO_DEMANGLING)
     {
+      ret = msvc_demangle (mangled, options);
+      if (ret)
+	return ret;
+
       ret = cplus_demangle_v3 (mangled, options);
       if (GNU_V3_DEMANGLING)
 	return ret;
