@@ -560,7 +560,8 @@ CONFIG_DEP_SUBDIR = $(addsuffix /$(DEPDIR),$(CONFIG_SRC_SUBDIR))
 # should be according to Posix).
 DEFS = @DEFS@
 GDB_CFLAGS = -I. -I$(srcdir) -I$(srcdir)/config \
-	-DLOCALEDIR="\"$(localedir)\"" $(DEFS)
+	-DLOCALEDIR="\"$(localedir)\"" $(DEFS) \
+	-I/usr/include/libr
 
 # MH_CFLAGS, if defined, has host-dependent CFLAGS from the config directory.
 GLOBAL_CFLAGS = $(MH_CFLAGS)
@@ -613,7 +614,8 @@ CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(LIBCTF) $(ZLIB) \
 	$(LIBEXPAT) $(LIBLZMA) $(LIBBABELTRACE) $(LIBIPT) \
 	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU) $(LIBICONV) $(LIBMPFR) \
 	$(SRCHIGH_LIBS) $(LIBXXHASH) $(PTHREAD_LIBS) \
-	-lLLVMDemangle
+	-lLLVMDemangle \
+	-lr_bin -lr_util
 CDEPS = $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) $(LIBCTF) \
 	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS) $(LIBGNU)
 
@@ -1168,7 +1170,8 @@ COMMON_SFILES = \
 	varobj.c \
 	xml-support.c \
 	xml-syscall.c \
-	xml-tdesc.c
+	xml-tdesc.c \
+	pdb.c
 
 # Links made at configuration time should not be specified here, since
 # SFILES is used in building the distribution archive.
@@ -1575,7 +1578,8 @@ HFILES_NO_SRCDIR = \
 	tui/tui-windata.h \
 	tui/tui-wingeneral.h \
 	tui/tui-winsource.h \
-	x86-tdep.h
+	x86-tdep.h \
+	pdb.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 

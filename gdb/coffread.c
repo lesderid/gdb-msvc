@@ -42,6 +42,8 @@
 #include "psymtab.h"
 #include "build-id.h"
 
+#include "pdb.h"
+
 /* The objfile we are currently reading.  */
 
 static struct objfile *coffread_objfile;
@@ -630,6 +632,9 @@ coff_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
      process it and define symbols accordingly.  */
 
   coff_symtab_read (reader, (long) symtab_offset, num_symbols, objfile);
+
+  /* Try reading additional symbols from PDB. */
+  read_pdb(objfile, reader);
 
   /* Install any minimal symbols that have been collected as the
      current minimal symbols for this objfile.  */
