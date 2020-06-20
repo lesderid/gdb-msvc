@@ -1176,7 +1176,7 @@ _bfd_XXi_slurp_codeview_record (bfd * abfd, file_ptr where, unsigned long length
       memcpy (&(cvinfo->Signature[8]), &(cvinfo70->Signature[8]), 8);
 
       cvinfo->SignatureLength = CV_INFO_SIGNATURE_LENGTH;
-      // cvinfo->PdbFileName = cvinfo70->PdbFileName;
+      strncpy(cvinfo->PdbFileName, cvinfo70->PdbFileName, sizeof(cvinfo->PdbFileName) - 1);
 
       return cvinfo;
     }
@@ -1187,7 +1187,7 @@ _bfd_XXi_slurp_codeview_record (bfd * abfd, file_ptr where, unsigned long length
       cvinfo->Age = H_GET_32(abfd, cvinfo20->Age);
       memcpy (cvinfo->Signature, cvinfo20->Signature, 4);
       cvinfo->SignatureLength = 4;
-      // cvinfo->PdbFileName = cvinfo20->PdbFileName;
+      strncpy(cvinfo->PdbFileName, cvinfo20->PdbFileName, sizeof(cvinfo->PdbFileName) - 1);
 
       return cvinfo;
     }
@@ -2726,9 +2726,9 @@ pe_print_debugdata (bfd * abfd, void * vfile)
 	    sprintf (&signature[i*2], "%02x", cvinfo->Signature[i] & 0xff);
 
 	  /* xgettext:c-format */
-	  fprintf (file, _("(format %c%c%c%c signature %s age %ld)\n"),
+	  fprintf (file, _("(format %c%c%c%c signature %s age %ld pdb_file %s)\n"),
 		   buffer[0], buffer[1], buffer[2], buffer[3],
-		   signature, cvinfo->Age);
+		   signature, cvinfo->Age, cvinfo->PdbFileName);
 	}
     }
 

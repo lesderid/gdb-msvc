@@ -167,7 +167,7 @@ typedef struct _CODEVIEW_INFO
   char          Signature[CV_INFO_SIGNATURE_LENGTH];
   unsigned int  SignatureLength;
   unsigned long Age;
-  // char PdbFileName[];
+  char PdbFileName[220]; //HACK
 } CODEVIEW_INFO;
 
 /* Default image base for NT.  */
