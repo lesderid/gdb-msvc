@@ -241,11 +241,12 @@ read_pdb (struct objfile *objfile, minimal_symbol_reader &reader)
                 {
                   asection *sect = section_by_name(sctn_header->name, objfile);
 
+                  auto section = sect ? sect->index : -1;
                   auto section_address = sect ? bfd_section_vma(sect) : 0;
                   auto address = section_address + gdata->offset;
                   if (address == 0) continue; //we don't want to record unresolved symbols or something?
                   auto type = mst_unknown; //FIXME
-                  reader.record_with_info(gdata->name.name, address, type, sect->index);
+                  reader.record_with_info(gdata->name.name, address, type, section);
                 }
             }
         }
