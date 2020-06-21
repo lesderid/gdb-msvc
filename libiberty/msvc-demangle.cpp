@@ -19,9 +19,6 @@ char* msvc_demangle(const char* sym, int options)
   if (!(options & DMGL_ANSI)) {
     /* TODO: Wait for LLVM's demangler to get a flag for this */;
   }
-  if (!(options & DMGL_PARAMS)) {
-    /* TODO: Wait for LLVM's demangler to get a flag for this */;
-  }
 
   //HACK: We should probably not do this on DMGL_AUTO, but the GNU C++
   //      demangler also omits the return type even without
@@ -37,15 +34,14 @@ char* msvc_demangle(const char* sym, int options)
 
   auto result = std::string(demangled);
 
-  //do we want this?
-  if (mangled != sym) {
-    result = std::string(sym, suffix - sym + 1) + result;
-  }
-
   //TODO: Use OF_NoTagSpecifier (not currently available as a MSDF_* flag)
   result = std::regex_replace(result, std::regex("(class|struct|union|enum) "), "");
 
   result = std::regex_replace(result, std::regex(" (\\*|&)"), "$1");
+
+  if (!(options & DMGL_PARAMS)) {
+    result = std::regex_replace(result, std::regex(" \(.*\)"), "");
+  }
 
   return strdup(result.c_str());
 }
