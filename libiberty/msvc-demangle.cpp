@@ -4,6 +4,7 @@
 #include <cstring>
 #include <regex>
 
+#include <llvm/Config/llvm-config.h>
 #include <llvm/Demangle/Demangle.h>
 
 extern "C"
@@ -27,7 +28,11 @@ char* msvc_demangle(const char* sym, int options)
     flags = llvm::MSDemangleFlags(flags | llvm::MSDF_NoReturnType);
   }
 
+#if LLVM_VERSION_MAJOR > 10 || LLVM_VERSION_MAJOR == 10 && (LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
+  auto demangled = llvm::microsoftDemangle(mangled, nullptr, nullptr, nullptr, nullptr, flags);
+#else
   auto demangled = llvm::microsoftDemangle(mangled, nullptr, nullptr, nullptr, flags);
+#endif
   if (demangled == nullptr) {
     return nullptr;
   }
