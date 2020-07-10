@@ -336,10 +336,6 @@ read_pdb (struct objfile *objfile, minimal_symbol_reader & reader)
 
       printf_filtered (_("Reading symbols from %s...\n"), pdb_path.c_str ());
 
-      //TODO: Use this. For now, we allocate the symtab so we don't print we found no symbols.
-      auto psymtab = allocate_psymtab (objfile->original_name, objfile);
-      (void) psymtab;
-
       it = r_list_iterator (gsym_data_stream->globals_list);
       while (r_list_iter_next (it))
         {
