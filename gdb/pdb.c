@@ -32,6 +32,15 @@ HACK: Honestly, this whole thing is a hack:
 #include <regex>
 #include <fstream>
 #include <cassert>
+
+extern "C" {
+#include <coff/internal.h>
+#include <coff/x86_64.h> //this is really dumb but oh well
+#include <coff/pe.h>
+#include <libcoff.h>
+#include <libpei.h>
+}
+
 #include "psympriv.h"
 
 //BEGIN radare2 imports
@@ -60,6 +69,10 @@ get_r_pdb (const std::string & path)
   else if (path.rfind ("target:", 0) == 0)
     {
       auto target = find_target_at (process_stratum);
+      if (!target)
+        {
+          return nullptr;
+        }
 
       void *buffer;
       size_t length;
@@ -70,8 +83,8 @@ get_r_pdb (const std::string & path)
         auto fd = target->fileio_open (nullptr,
                                        path.c_str () + sizeof ("target:") - 1,
                                        FILEIO_O_RDONLY,
-                                       /* mode */ 0,
-                                       /* warn_if_slow */ true,
+                                       0 /* mode */,
+                                       true /* warn_if_slow */,
                                        &errno);
 
         if (fd == -1)
@@ -127,19 +140,109 @@ get_r_pdb (const std::string & path)
   return nullptr;
 }
 
-static std::string
-get_pdb_path (struct objfile *objfile)
+static gdb::optional<std::string>
+get_codeview_pdb_path (objfile *objfile)
 {
-  /* HACK: Use _bfd_XXi_slurp_codeview_record to find the 'correct' PDB path.
+  gdb::optional<std::string> nullopt;
 
-     We should use this as fallback, but we shouldn't try to find a PDB if
-     there is no codeview record at all.  */
+  bfd *abfd = objfile->obfd;
+
+  pe_data_type *pe = pe_data (abfd);
+  struct internal_extra_pe_aouthdr *extra = &pe->pe_opthdr;
+
+  bfd_size_type size = extra->DataDirectory[PE_DEBUG_DATA].Size;
+  if (size == 0)
+    return nullopt;
+  bfd_vma addr = extra->DataDirectory[PE_DEBUG_DATA].VirtualAddress + extra->ImageBase;
+
+  asection *section;
+  for (section = abfd->sections; section != nullptr; section = section->next)
+    {
+      if ((addr >= section->vma) && (addr < (section->vma + section->size)))
+        break;
+    }
+  if (section == nullptr || !(section->flags & SEC_HAS_CONTENTS) || section->size < size)
+    return nullopt;
+
+  bfd_size_type data_offset;
+  data_offset = addr - section->vma;
+  if (size > (section->size - data_offset))
+    return nullopt;
+
+  bfd_byte *data = nullptr;
+  //TODO: Check if this leaks memory (data isn't freed)
+  if (!bfd_malloc_and_get_section (abfd, section, &data))
+    {
+      if (data != nullptr)
+        free (data);
+      return nullopt;
+    }
+
+  for (auto i = 0; i < size / sizeof (struct external_IMAGE_DEBUG_DIRECTORY); i++)
+    {
+      struct external_IMAGE_DEBUG_DIRECTORY *ext
+        = &((struct external_IMAGE_DEBUG_DIRECTORY *) (data + data_offset))[i];
+      struct internal_IMAGE_DEBUG_DIRECTORY idd{};
+
+      _bfd_pei_swap_debugdir_in (abfd, ext, &idd);
+
+      if (idd.Type == PE_IMAGE_DEBUG_TYPE_CODEVIEW)
+        {
+          char buffer[256 + 1] ATTRIBUTE_ALIGNED_ALIGNOF (CODEVIEW_INFO);
+          auto *cvinfo = (CODEVIEW_INFO *) buffer;
+
+          if (!_bfd_pei_slurp_codeview_record (abfd, (file_ptr) idd.PointerToRawData,
+                                               idd.SizeOfData, cvinfo))
+            continue;
+
+          return std::string (cvinfo->PdbFileName);
+        }
+    }
+
+  return nullopt;
+}
+
+static std::vector<std::string>
+get_pdb_paths (struct objfile *objfile)
+{
+  std::vector<std::string> paths;
+
+  auto codeview_pdb_path = get_codeview_pdb_path (objfile);
+  if (!codeview_pdb_path)
+    return paths;
+
+  paths.push_back (*codeview_pdb_path);
+  paths.push_back ("target:" + *codeview_pdb_path);
 
   auto real_path = gdb_realpath (objfile->original_name);
-  auto pdb_path = std::regex_replace (std::string (real_path.get ()),
-                                      std::regex ("\\.[^.]*$"),
-                                      ".pdb");
-  return pdb_path;
+  auto naive_pdb_path = std::regex_replace (std::string (real_path.get ()),
+                                            std::regex ("\\.[^.]*$"),
+                                            ".pdb");
+  naive_pdb_path = std::regex_replace (naive_pdb_path,
+                                       std::regex ("target:"),
+                                       "");
+
+  paths.push_back (naive_pdb_path);
+  paths.push_back ("target:" + naive_pdb_path);
+
+  return paths;
+}
+
+static std::tuple<std::unique_ptr<R_PDB>, std::string>
+load_pdb (objfile *objfile)
+{
+  auto paths = get_pdb_paths (objfile);
+
+  if (paths.empty ()) return {nullptr, std::string ()};
+
+  for (auto & path : paths)
+    {
+      auto p = get_r_pdb (path);
+      if (p)
+        return {std::move (p), path};
+    }
+
+  return {nullptr, std::string ()};
 }
 
 struct find_section_by_name_args {
@@ -172,89 +275,91 @@ section_by_name (const char *name, struct objfile *objfile)
 void
 read_pdb (struct objfile *objfile, minimal_symbol_reader & reader)
 {
-  auto pdb_path = get_pdb_path (objfile);
+  std::unique_ptr<R_PDB> pdb;
+  std::string pdb_path;
+  std::tie (pdb, pdb_path) = load_pdb (objfile);
 
-  auto pdb = get_r_pdb (pdb_path);
-  if (pdb)
+  if (!pdb)
+    return;
+
+  if (pdb->pdb_parse (pdb.get ()))
     {
-      if (pdb->pdb_parse (pdb.get ()))
+      SStreamParseFunc *omap = nullptr, *sctns = nullptr, *sctns_orig = nullptr, *gsym = nullptr, *tmp;
+      SIMAGE_SECTION_HEADER *sctn_header;
+      SGDATAStream *gsym_data_stream;
+      SPEStream *pe_stream = nullptr;
+      SGlobal *gdata;
+      RListIter *it;
+      RList *l;
+
+      l = pdb->pdb_streams2;
+      it = r_list_iterator (l);
+      while (r_list_iter_next (it))
         {
-          SStreamParseFunc *omap = nullptr, *sctns = nullptr, *sctns_orig = nullptr, *gsym = nullptr, *tmp;
-          SIMAGE_SECTION_HEADER *sctn_header;
-          SGDATAStream *gsym_data_stream;
-          SPEStream *pe_stream = nullptr;
-          SGlobal *gdata;
-          RListIter *it;
-          RList *l;
-
-          l = pdb->pdb_streams2;
-          it = r_list_iterator (l);
-          while (r_list_iter_next (it))
+          tmp = (SStreamParseFunc *) r_list_iter_get (it);
+          switch (tmp->type)
             {
-              tmp = (SStreamParseFunc *) r_list_iter_get (it);
-              switch (tmp->type)
-                {
-                  case ePDB_STREAM_SECT__HDR_ORIG:
-                    sctns_orig = tmp;
-                  break;
-                  case ePDB_STREAM_SECT_HDR:
-                    sctns = tmp;
-                  break;
-                  case ePDB_STREAM_OMAP_FROM_SRC:
-                    omap = tmp;
-                  break;
-                  case ePDB_STREAM_GSYM:
-                    gsym = tmp;
-                  break;
-                  default:
-                    break;
-                }
-            }
-          if (!gsym)
-            {
-              eprintf ("There is no global symbols in current PDB.\n");
-              return;
-            }
-          gsym_data_stream = (SGDATAStream *) gsym->stream;
-          if ((omap != nullptr) && (sctns_orig != nullptr))
-            {
-              pe_stream = (SPEStream *) sctns_orig->stream;
-            }
-          else if (sctns)
-            {
-              pe_stream = (SPEStream *) sctns->stream;
-            }
-          if (!pe_stream)
-            {
-              return;
-            }
-
-          printf_filtered (_("Reading symbols from %s...\n"), pdb_path.c_str ());
-
-          //TODO: Use this. For now, we allocate the symtab so we don't print we found no symbols.
-          auto psymtab = allocate_psymtab (objfile->original_name, objfile);
-          (void) psymtab;
-
-          it = r_list_iterator (gsym_data_stream->globals_list);
-          while (r_list_iter_next (it))
-            {
-              gdata = (SGlobal *) r_list_iter_get (it);
-              sctn_header = (SIMAGE_SECTION_HEADER*) r_list_get_n (pe_stream->sections_hdrs, (gdata->segment - 1));
-              if (sctn_header)
-                {
-                  asection *sect = section_by_name (sctn_header->name, objfile);
-
-                  auto section = sect ? sect->index : -1;
-                  auto section_address = sect ? bfd_section_vma (sect) : 0;
-                  auto address = section_address + gdata->offset;
-                  if (address == 0)
-                    continue; //we don't want to record unresolved symbols or something?
-                  auto type = mst_text; //FIXME
-                  reader.record_with_info (gdata->name.name, address, type, section);
-                }
+              case ePDB_STREAM_SECT__HDR_ORIG:
+                sctns_orig = tmp;
+              break;
+              case ePDB_STREAM_SECT_HDR:
+                sctns = tmp;
+              break;
+              case ePDB_STREAM_OMAP_FROM_SRC:
+                omap = tmp;
+              break;
+              case ePDB_STREAM_GSYM:
+                gsym = tmp;
+              break;
+              default:
+                break;
             }
         }
+      if (!gsym)
+        {
+          eprintf ("There is no global symbols in current PDB.\n");
+          return;
+        }
+      gsym_data_stream = (SGDATAStream *) gsym->stream;
+      if ((omap != nullptr) && (sctns_orig != nullptr))
+        {
+          pe_stream = (SPEStream *) sctns_orig->stream;
+        }
+      else if (sctns)
+        {
+          pe_stream = (SPEStream *) sctns->stream;
+        }
+      if (!pe_stream)
+        {
+          return;
+        }
 
-      pdb->finish_pdb_parse (pdb.get ());
+      printf_filtered (_("Reading symbols from %s...\n"), pdb_path.c_str ());
+
+      //TODO: Use this. For now, we allocate the symtab so we don't print we found no symbols.
+      auto psymtab = allocate_psymtab (objfile->original_name, objfile);
+      (void) psymtab;
+
+      it = r_list_iterator (gsym_data_stream->globals_list);
+      while (r_list_iter_next (it))
+        {
+          gdata = (SGlobal *) r_list_iter_get (it);
+          sctn_header = (SIMAGE_SECTION_HEADER *) r_list_get_n (pe_stream->sections_hdrs,
+                                                                gdata->segment - 1);
+          if (sctn_header)
+            {
+              asection *sect = section_by_name (sctn_header->name, objfile);
+
+              auto section = sect ? sect->index : -1;
+              auto section_address = sect ? bfd_section_vma (sect) : 0;
+              auto address = section_address + gdata->offset;
+              if (address == 0)
+                continue; //we don't want to record unresolved symbols or something?
+              auto type = mst_text; //FIXME
+              reader.record_with_info (gdata->name.name, address, type, section);
+            }
+        }
     }
+
+  pdb->finish_pdb_parse (pdb.get ());
 }
