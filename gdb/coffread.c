@@ -447,7 +447,7 @@ is_import_fixup_symbol (struct coff_symbol *cs,
 static struct minimal_symbol *
 record_minimal_symbol (minimal_symbol_reader &reader,
 		       struct coff_symbol *cs, CORE_ADDR address,
-		       enum minimal_symbol_type type, int section, 
+		       enum minimal_symbol_type type, int section,
 		       struct objfile *objfile)
 {
   /* We don't want TDESC entry points in the minimal symbol table.  */
@@ -545,7 +545,7 @@ coff_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
   int symtab_offset;
   int stringtab_offset;
   int stabstrsize;
-  
+
   info = coff_objfile_data_key.get (objfile);
   symfile_bfd = abfd;		/* Kludge for swap routines.  */
 
@@ -717,15 +717,25 @@ coff_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
       std::string debugfile = find_separate_debug_file_by_buildid (objfile);
 
       if (debugfile.empty ())
-	debugfile = find_separate_debug_file_by_debuglink (objfile);
+        debugfile = find_separate_debug_file_by_debuglink (objfile);
 
       if (!debugfile.empty ())
-	{
-	  gdb_bfd_ref_ptr debug_bfd (symfile_bfd_open (debugfile.c_str ()));
+        {
+          gdb_bfd_ref_ptr debug_bfd (symfile_bfd_open (debugfile.c_str ()));
 
-	  symbol_file_add_separate (debug_bfd.get (), debugfile.c_str (),
-				    symfile_flags, objfile);
-	}
+          symbol_file_add_separate (debug_bfd.get (), debugfile.c_str (),
+                                    symfile_flags, objfile);
+        }
+
+      if (debugfile.empty ())
+        {
+          gdb_bfd_ref_ptr debug_bfd (try_load_pdb_bfd (objfile));
+          if (debug_bfd.get ())
+            {
+              symbol_file_add_separate (debug_bfd.get (), debug_bfd->filename,
+                                        symfile_flags, objfile);
+            }
+        }
     }
 }
 
@@ -1058,7 +1068,7 @@ coff_symtab_read (minimal_symbol_reader &reader,
 	      newobj = push_context (depth, fcn_start_addr);
 	      fcn_cs_saved.c_name = getsymname (&fcn_sym_saved);
 	      newobj->name =
-		process_coff_symbol (&fcn_cs_saved, 
+		process_coff_symbol (&fcn_cs_saved,
 				     &fcn_aux_saved, objfile);
 	    }
 	  else if (strcmp (cs->c_name, ".ef") == 0)
@@ -1309,7 +1319,7 @@ init_stringtab (bfd *abfd, long offset, gdb::unique_xmalloc_ptr<char> *storage)
   if (length == sizeof length)	/* Empty table -- just the count.  */
     return 0;
 
-  val = bfd_bread (stringtab + sizeof lengthbuf, 
+  val = bfd_bread (stringtab + sizeof lengthbuf,
 		   length - sizeof lengthbuf, abfd);
   if (val != length - sizeof lengthbuf || stringtab[length - 1] != '\0')
     return -1;
@@ -1469,8 +1479,8 @@ patch_type (struct type *type, struct type *real_type)
   TYPE_FIELDS (target) = (struct field *) TYPE_ALLOC (target,
 						      field_size);
 
-  memcpy (TYPE_FIELDS (target), 
-	  TYPE_FIELDS (real_target), 
+  memcpy (TYPE_FIELDS (target),
+	  TYPE_FIELDS (real_target),
 	  field_size);
 
   if (TYPE_NAME (real_target))
@@ -1679,7 +1689,7 @@ process_coff_symbol (struct coff_symbol *cs,
 		  /* If we are giving a name to a type such as
 		     "pointer to foo" or "function returning foo", we
 		     better not set the TYPE_NAME.  If the program
-		     contains "typedef char *caddr_t;", we don't want 
+		     contains "typedef char *caddr_t;", we don't want
 		     all variables of type char * to print as caddr_t.
 		     This is not just a consequence of GDB's type
 		     management; CC and GCC (at least through version
@@ -1827,9 +1837,9 @@ decode_type (struct coff_symbol *cs, unsigned int c_type,
    return the type that the function returns.  */
 
 static struct type *
-decode_function_type (struct coff_symbol *cs, 
+decode_function_type (struct coff_symbol *cs,
 		      unsigned int c_type,
-		      union internal_auxent *aux, 
+		      union internal_auxent *aux,
 		      struct objfile *objfile)
 {
   if (aux->x_sym.x_tagndx.l == 0)
@@ -1842,9 +1852,9 @@ decode_function_type (struct coff_symbol *cs,
 /* Basic C types.  */
 
 static struct type *
-decode_base_type (struct coff_symbol *cs, 
+decode_base_type (struct coff_symbol *cs,
 		  unsigned int c_type,
-		  union internal_auxent *aux, 
+		  union internal_auxent *aux,
 		  struct objfile *objfile)
 {
   struct gdbarch *gdbarch = get_objfile_arch (objfile);

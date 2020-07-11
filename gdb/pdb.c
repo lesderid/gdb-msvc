@@ -13,7 +13,9 @@ HACK: Honestly, this whole thing is a hack:
 
 */
 
-#include "defs.h"
+#include "pdb.h"
+
+extern const bfd_target pdb_vec; //from targets.c
 
 //BEGIN HACK (conflicting symbols)
 #undef QUIT
@@ -56,6 +58,33 @@ typedef struct {
   free_func free;
 } SStreamParseFunc;
 //END radare2 imports
+
+struct find_section_by_name_args {
+  const char *name;
+  asection **resultp;
+};
+
+static void
+find_section_by_name_filter (bfd *abfd, asection *sect, void *obj)
+{
+  (void) abfd;
+
+  auto *args = (struct find_section_by_name_args *) obj;
+
+  if (strcmp (sect->name, args->name) == 0)
+    *args->resultp = sect;
+}
+
+static struct bfd_section *
+section_by_name (const char *name, struct objfile *objfile)
+{
+  asection *sect = nullptr;
+  struct find_section_by_name_args args{};
+  args.name = name;
+  args.resultp = &sect;
+  bfd_map_over_sections (objfile->obfd, find_section_by_name_filter, &args);
+  return sect;
+}
 
 static std::unique_ptr<R_PDB>
 get_r_pdb (const std::string & path)
@@ -245,31 +274,30 @@ load_pdb (objfile *objfile)
   return {nullptr, std::string ()};
 }
 
-struct find_section_by_name_args {
-  const char *name;
-  asection **resultp;
-};
-
-static void
-find_section_by_name_filter (bfd *abfd, asection *sect, void *obj)
+gdb_bfd_ref_ptr
+try_load_pdb_bfd (objfile *objfile)
 {
-  (void) abfd;
+  auto paths = get_pdb_paths (objfile);
 
-  auto *args = (struct find_section_by_name_args *) obj;
+  if (paths.empty ()) return nullptr;
 
-  if (strcmp (sect->name, args->name) == 0)
-    *args->resultp = sect;
-}
+  for (auto & path : paths)
+    {
+      try
+        {
+          gdb_bfd_ref_ptr debug_bfd (symfile_bfd_open (path.c_str ()));
+          if (debug_bfd.get () && debug_bfd.get ()->xvec == &pdb_vec)
+            {
+              return debug_bfd;
+            }
+        }
+      catch (gdb_exception_error & error)
+        {
+          continue;
+        }
+    }
 
-static struct bfd_section *
-section_by_name (const char *name, struct objfile *objfile)
-{
-  asection *sect = nullptr;
-  struct find_section_by_name_args args{};
-  args.name = name;
-  args.resultp = &sect;
-  bfd_map_over_sections (objfile->obfd, find_section_by_name_filter, &args);
-  return sect;
+  return nullptr;
 }
 
 void
