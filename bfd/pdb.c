@@ -1,5 +1,9 @@
 /* PDB support for BFD. */
 
+/* Includes code from radare2:
+   radare - LGPL - Copyright 2014 - inisider
+   (https://github.com/radareorg/radare2)  */
+
 #include "pdb.h"
 
 /* Called when the BFD is being closed to do any necessary cleanup.  */
