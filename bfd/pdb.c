@@ -6,7 +6,12 @@
 bfd_boolean
 bfd_pdb_close_and_cleanup (bfd *abfd)
 {
-  abfd->tdata.pdb_data->pdb->finish_pdb_parse (abfd->tdata.pdb_data->pdb);
+  if (abfd->tdata.pdb_data
+      && abfd->tdata.pdb_data->pdb
+      && abfd->tdata.pdb_data->pdb->finish_pdb_parse)
+    {
+      abfd->tdata.pdb_data->pdb->finish_pdb_parse (abfd->tdata.pdb_data->pdb);
+    }
   return TRUE;
 }
 
@@ -96,12 +101,20 @@ r_buffer_seek (RBuffer *buffer, st64 address, int whence)
   return abfd->iovec->bseek (abfd, address, whence);
 }
 
+static bool
+r_buffer_fini(RBuffer *buffer)
+{
+  //if we return TRUE, radare2 will try calling free on our bfd_alloc'ed buffer
+  return FALSE;
+}
+
 static bfd_pdb_data_struct *
 get_bfd_pdb_data (bfd *abfd)
 {
   RBufferMethods *buffer_methods = bfd_zalloc (abfd, sizeof (RBufferMethods));
   buffer_methods->read = &r_buffer_read;
   buffer_methods->seek = &r_buffer_seek;
+  buffer_methods->fini = &r_buffer_fini;
 
   RBuffer *r_buffer = bfd_zalloc (abfd, sizeof (RBuffer));
   r_buffer->methods = buffer_methods;
