@@ -6,6 +6,7 @@
 bfd_boolean
 bfd_pdb_close_and_cleanup (bfd *abfd)
 {
+  abfd->tdata.pdb_data->pdb->finish_pdb_parse (abfd->tdata.pdb_data->pdb);
   return TRUE;
 }
 
@@ -17,11 +18,7 @@ bfd_pdb_bfd_free_cached_info (bfd *abfd)
 }
 
 /* Called when a new section is created.  */
-bfd_boolean
-bfd_pdb_new_section_hook (bfd *abfd, asection *sec)
-{
-  return FALSE;
-}
+#define bfd_pdb_new_section_hook _bfd_generic_new_section_hook
 
 /* Read the contents of a section.  */
 #define bfd_pdb_get_section_contents _bfd_generic_get_section_contents
@@ -39,11 +36,7 @@ bfd_pdb_canonicalize_symtab (bfd *abfd, asymbol **alocation)
   return -1;
 }
 
-asymbol *
-bfd_pdb_make_empty_symbol (bfd *abfd)
-{
-  return NULL;
-}
+#define bfd_pdb_make_empty_symbol _bfd_generic_make_empty_symbol
 
 void
 bfd_pdb_print_symbol (bfd *abfd,
@@ -84,10 +77,10 @@ bfd_pdb_find_nearest_line (bfd *abfd,
 /* Back-door to allow format-aware applications to create debug symbols
    while using BFD for everything else.  Currently used by the assembler
    when creating COFF files.  */
-#define bfd_pdb_bfd_make_debug_symbol  _bfd_nosymbols_bfd_make_debug_symbol
+#define bfd_pdb_bfd_make_debug_symbol _bfd_nosymbols_bfd_make_debug_symbol
 
-#define bfd_pdb_read_minisymbols _bfd_generic_read_minisymbols
-#define bfd_pdb_minisymbol_to_symbol _bfd_generic_minisymbol_to_symbol
+#define bfd_pdb_read_minisymbols _bfd_nosymbols_read_minisymbols
+#define bfd_pdb_minisymbol_to_symbol _bfd_nosymbols_minisymbol_to_symbol
 
 static st64
 r_buffer_read (RBuffer *buffer, ut8 *out, ut64 length)
@@ -126,14 +119,65 @@ get_bfd_pdb_data (bfd *abfd)
   return NULL;
 }
 
+void
+bfd_pdb_get_sections (bfd *abfd)
+{
+  R_PDB *r_pdb = abfd->tdata.pdb_data->pdb;
+
+  SPEStream *section_stream = NULL;
+
+  RListIter *it = r_list_iterator (r_pdb->pdb_streams2);
+  while (r_list_iter_next (it))
+    {
+      SStreamParseFunc *stream = r_list_iter_get (it);
+      if (stream->type == ePDB_STREAM_SECT_HDR)
+        section_stream = stream->stream;
+    }
+
+  if (!section_stream)
+    {
+      _bfd_error_handler (_("%pB: no sections found in PDB"), abfd);
+      return;
+    }
+
+  it = r_list_iterator (section_stream->sections_hdrs);
+  while (r_list_iter_next (it))
+    {
+      SIMAGE_SECTION_HEADER *section_header = r_list_iter_get (it);
+      if (section_header)
+        {
+          //FIXME: These flags are probably not correct
+          asection *section = bfd_make_section_with_flags (abfd,
+                                                           section_header->name,
+                                                           SEC_LOAD);
+          section->vma = section_header->virtual_address;
+          section->size = section_header->size_of_raw_data;
+          //section->userdata = section_header;
+        }
+    }
+}
+
 const bfd_target *
 bfd_pdb_check_format (bfd *abfd)
 {
   if ((abfd->tdata.pdb_data = get_bfd_pdb_data (abfd)))
     {
+      R_PDB *r_pdb = abfd->tdata.pdb_data->pdb;
+
+      if (r_pdb->pdb_parse (r_pdb))
+        {
+          bfd_pdb_get_sections (abfd);
+        }
+      else
+        {
+          _bfd_error_handler (_("%pB: malformed PDB file"), abfd);
+          goto fail;
+        }
+
       return abfd->xvec;
     }
 
+  fail:
   bfd_set_error (bfd_error_wrong_format);
   return NULL;
 }

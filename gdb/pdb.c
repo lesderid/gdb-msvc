@@ -45,19 +45,7 @@ extern "C" {
 
 #include "psympriv.h"
 
-//BEGIN radare2 imports
-#include "pdb_types.h"
-
-typedef void (*parse_stream_) (void *stream, R_STREAM_FILE *stream_file);
-
-typedef struct {
-  int indx;
-  parse_stream_ parse_stream;
-  void *stream;
-  EStream type;
-  free_func free;
-} SStreamParseFunc;
-//END radare2 imports
+#include "bfd/pdb-types.h"
 
 struct find_section_by_name_args {
   const char *name;
@@ -199,13 +187,8 @@ get_codeview_pdb_path (objfile *objfile)
     return nullopt;
 
   bfd_byte *data = nullptr;
-  //TODO: Check if this leaks memory (data isn't freed)
   if (!bfd_malloc_and_get_section (abfd, section, &data))
-    {
-      if (data != nullptr)
-        free (data);
-      return nullopt;
-    }
+    return nullopt;
 
   for (auto i = 0; i < size / sizeof (struct external_IMAGE_DEBUG_DIRECTORY); i++)
     {
@@ -239,6 +222,8 @@ get_pdb_paths (struct objfile *objfile)
   auto codeview_pdb_path = get_codeview_pdb_path (objfile);
   if (!codeview_pdb_path)
     return paths; //if there is no CodeView PDB path, we assume no PDB exists
+
+  //TODO: Only push_back 'target:' paths if we have a remote target
 
   paths.push_back (*codeview_pdb_path);
   paths.push_back ("target:" + *codeview_pdb_path);
@@ -386,4 +371,44 @@ read_pdb (struct objfile *objfile, minimal_symbol_reader & reader)
     }
 
   pdb->finish_pdb_parse (pdb.get ());
+}
+
+static void
+pdb_sym_new_init (objfile *objfile)
+{
+}
+
+static void
+pdb_sym_init (objfile *objfile)
+{
+}
+
+static void
+pdb_sym_read (objfile *objfile, symfile_add_flags symfile_flags)
+{
+}
+
+static void
+pdb_sym_finish (objfile *objfile)
+{
+}
+
+const struct sym_fns pdb_sym_fns = {
+  pdb_sym_new_init,
+  pdb_sym_init,
+  pdb_sym_read,
+  nullptr, /* sym_read_psymbols */
+  pdb_sym_finish,
+  default_symfile_offsets,
+  default_symfile_segments,
+  nullptr, /* sym_read_linetable */
+  default_symfile_relocate,
+  nullptr, /* sym_probe_fns */
+  &psym_functions
+};
+
+void
+_initialize_pdb ()
+{
+  add_symtab_fns (bfd_target_pdb_flavour, &pdb_sym_fns);
 }

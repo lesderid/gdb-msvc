@@ -726,8 +726,7 @@ coff_symfile_read (struct objfile *objfile, symfile_add_flags symfile_flags)
           symbol_file_add_separate (debug_bfd.get (), debugfile.c_str (),
                                     symfile_flags, objfile);
         }
-
-      if (debugfile.empty ())
+      else
         {
           gdb_bfd_ref_ptr debug_bfd (try_load_pdb_bfd (objfile));
           if (debug_bfd.get ())
