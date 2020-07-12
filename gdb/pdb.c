@@ -238,7 +238,7 @@ get_pdb_paths (struct objfile *objfile)
 
   auto codeview_pdb_path = get_codeview_pdb_path (objfile);
   if (!codeview_pdb_path)
-    return paths;
+    return paths; //if there is no CodeView PDB path, we assume no PDB exists
 
   paths.push_back (*codeview_pdb_path);
   paths.push_back ("target:" + *codeview_pdb_path);

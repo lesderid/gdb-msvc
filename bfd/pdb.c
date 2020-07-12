@@ -6,7 +6,7 @@
 bfd_boolean
 bfd_pdb_close_and_cleanup (bfd *abfd)
 {
-  return FALSE;
+  return TRUE;
 }
 
 /* Ask the BFD to free all cached information.  */
@@ -89,9 +89,51 @@ bfd_pdb_find_nearest_line (bfd *abfd,
 #define bfd_pdb_read_minisymbols _bfd_generic_read_minisymbols
 #define bfd_pdb_minisymbol_to_symbol _bfd_generic_minisymbol_to_symbol
 
+static st64
+r_buffer_read (RBuffer *buffer, ut8 *out, ut64 length)
+{
+  bfd *abfd = buffer->priv;
+  return abfd->iovec->bread (abfd, out, length);
+}
+
+static st64
+r_buffer_seek (RBuffer *buffer, st64 address, int whence)
+{
+  bfd *abfd = buffer->priv;
+  return abfd->iovec->bseek (abfd, address, whence);
+}
+
+static bfd_pdb_data_struct *
+get_bfd_pdb_data (bfd *abfd)
+{
+  RBufferMethods *buffer_methods = bfd_zalloc (abfd, sizeof (RBufferMethods));
+  buffer_methods->read = &r_buffer_read;
+  buffer_methods->seek = &r_buffer_seek;
+
+  RBuffer *r_buffer = bfd_zalloc (abfd, sizeof (RBuffer));
+  r_buffer->methods = buffer_methods;
+  r_buffer->priv = abfd;
+  r_buffer->readonly = TRUE;
+
+  R_PDB *pdb = bfd_zalloc (abfd, sizeof (R_PDB));
+  if (init_pdb_parser_with_buf (pdb, r_buffer))
+    {
+      bfd_pdb_data_struct *result = bfd_alloc (abfd, sizeof (bfd_pdb_data_struct));
+      result->pdb = pdb;
+      return result;
+    }
+
+  return NULL;
+}
+
 const bfd_target *
 bfd_pdb_check_format (bfd *abfd)
 {
+  if ((abfd->tdata.pdb_data = get_bfd_pdb_data (abfd)))
+    {
+      return abfd->xvec;
+    }
+
   bfd_set_error (bfd_error_wrong_format);
   return NULL;
 }
