@@ -1,6 +1,6 @@
-# generated automatically by aclocal 1.15.1 -*- Autoconf -*-
+# generated automatically by aclocal 1.16.2 -*- Autoconf -*-
 
-# Copyright (C) 1996-2017 Free Software Foundation, Inc.
+# Copyright (C) 1996-2020 Free Software Foundation, Inc.
 
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -14,7 +14,7 @@
 m4_ifndef([AC_CONFIG_MACRO_DIRS], [m4_defun([_AM_CONFIG_MACRO_DIRS], [])m4_defun([AC_CONFIG_MACRO_DIRS], [_AM_CONFIG_MACRO_DIRS($@)])])
 # AM_CONDITIONAL                                            -*- Autoconf -*-
 
-# Copyright (C) 1997-2017 Free Software Foundation, Inc.
+# Copyright (C) 1997-2020 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -48,7 +48,7 @@ fi])])
 # Add --enable-maintainer-mode option to configure.         -*- Autoconf -*-
 # From Jim Meyering
 
-# Copyright (C) 1996-2017 Free Software Foundation, Inc.
+# Copyright (C) 1996-2020 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
@@ -81,7 +81,7 @@ AC_MSG_CHECKING([whether to enable maintainer-specific portions of Makefiles])
 ]
 )
 
-# Copyright (C) 2006-2017 Free Software Foundation, Inc.
+# Copyright (C) 2006-2020 Free Software Foundation, Inc.
 #
 # This file is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
