@@ -52,8 +52,11 @@ ZLIBINC = @zlibinc@
 
 WARN_CFLAGS = @WARN_CFLAGS@
 NO_WERROR = @NO_WERROR@
-AM_CFLAGS = $(WARN_CFLAGS) $(ZLIBINC)
+AM_CFLAGS = $(WARN_CFLAGS) $(ZLIBINC) $(DEPS_CFLAGS)
 AM_CPPFLAGS = -DBINDIR='"$(bindir)"' -DLIBDIR='"$(libdir)"'
+
+AM_LIBS = $(DEPS_LIBS)
+
 if PLUGINS
 bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
 LIBDL = @lt_cv_dlopen_libs@
@@ -397,7 +400,8 @@ BFD32_BACKENDS = \
 	xcofflink.lo \
 	xsym.lo \
 	xtensa-isa.lo \
-	xtensa-modules.lo
+	xtensa-modules.lo \
+	pdb.lo
 
 BFD32_BACKENDS_CFILES = \
 	aout-cris.c \
@@ -532,7 +536,8 @@ BFD32_BACKENDS_CFILES = \
 	xcofflink.c \
 	xsym.c \
 	xtensa-isa.c \
-	xtensa-modules.c
+	xtensa-modules.c \
+	pdb.c
 
 # The .o files needed by all of the 64 bit vectors that are configured into
 # target_vector in targets.c if configured with --enable-targets=all
@@ -706,7 +711,8 @@ SOURCE_HFILES = \
 	som.h sysdep.h \
 	version.h vms.h \
 	wasm-module.h \
-	xcofflink.h xsym.h
+	xcofflink.h xsym.h \
+	pdb.h pdb-types.h
 
 ## ... and .h files which are in the build tree, minus config.h and bfd.h
 BUILD_HFILES = \

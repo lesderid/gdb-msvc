@@ -2233,4 +2233,12 @@ GDB_AC_TRANSFORM([gcore], [GCORE_TRANSFORM_NAME])
 AC_CONFIG_FILES([gcore], [chmod +x gcore])
 AC_CONFIG_FILES([Makefile gdb-gdb.gdb gdb-gdb.py doc/Makefile data-directory/Makefile])
 
+PKG_CHECK_MODULES([RADARE], [r_bin r_util])
+
+AC_CHECK_PROG(LLVM_CONFIG_FOUND, llvm-config, yes)
+AS_IF([test x"$LLVM_CONFIG_FOUND" != x"yes"], [AC_MSG_ERROR([Please make sure llvm-config is in your PATH.])])
+AC_SUBST([LLVM_CXXFLAGS], [$(llvm-config --cxxflags)])
+AC_SUBST([LLVM_LDFLAGS], [$(llvm-config --ldflags)])
+AC_SUBST([LLVM_LIBS], [$(llvm-config --libs)])
+
 AC_OUTPUT

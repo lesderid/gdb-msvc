@@ -561,7 +561,7 @@ CONFIG_DEP_SUBDIR = $(addsuffix /$(DEPDIR),$(CONFIG_SRC_SUBDIR))
 DEFS = @DEFS@
 GDB_CFLAGS = -I. -I$(srcdir) -I$(srcdir)/config \
 	-DLOCALEDIR="\"$(localedir)\"" $(DEFS) \
-	-I/usr/include/libr
+	@RADARE_CFLAGS@ @LLVM_LDFLAGS@
 
 # MH_CFLAGS, if defined, has host-dependent CFLAGS from the config directory.
 GLOBAL_CFLAGS = $(MH_CFLAGS)
@@ -614,8 +614,7 @@ CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(LIBCTF) $(ZLIB) \
 	$(LIBEXPAT) $(LIBLZMA) $(LIBBABELTRACE) $(LIBIPT) \
 	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU) $(LIBICONV) $(LIBMPFR) \
 	$(SRCHIGH_LIBS) $(LIBXXHASH) $(PTHREAD_LIBS) \
-	-lLLVMDemangle \
-	-lr_bin -lr_util
+	@RADARE_LIBS@ @LLVM_LIBS@
 CDEPS = $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) $(LIBCTF) \
 	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS) $(LIBGNU)
 
