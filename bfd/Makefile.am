@@ -52,10 +52,13 @@ ZLIBINC = @zlibinc@
 
 WARN_CFLAGS = @WARN_CFLAGS@
 NO_WERROR = @NO_WERROR@
-AM_CFLAGS = $(WARN_CFLAGS) $(ZLIBINC) $(DEPS_CFLAGS)
-AM_CPPFLAGS = -DBINDIR='"$(bindir)"' -DLIBDIR='"$(libdir)"'
 
-AM_LIBS = $(DEPS_LIBS)
+AM_CFLAGS = $(WARN_CFLAGS) $(ZLIBINC)
+AM_CXXFLAGS = -Werror $(LLVM_CXXFLAGS)
+AM_CPPFLAGS = -DBINDIR='"$(bindir)"' -DLIBDIR='"$(libdir)"'
+AM_LIBS = $(LLVM_LIBS)
+
+libbfd_la_LDFLAGS += $(LLVM_LDFLAGS)
 
 if PLUGINS
 bfdinclude_HEADERS += $(INCDIR)/plugin-api.h
@@ -400,8 +403,7 @@ BFD32_BACKENDS = \
 	xcofflink.lo \
 	xsym.lo \
 	xtensa-isa.lo \
-	xtensa-modules.lo \
-	pdb.lo
+	xtensa-modules.lo
 
 BFD32_BACKENDS_CFILES = \
 	aout-cris.c \
@@ -536,8 +538,13 @@ BFD32_BACKENDS_CFILES = \
 	xcofflink.c \
 	xsym.c \
 	xtensa-isa.c \
-	xtensa-modules.c \
-	pdb.c
+	xtensa-modules.c
+
+PDB_CXXFILES = \
+	pdb.cpp
+
+PDB_OBJS = \
+	pdb.lo
 
 # The .o files needed by all of the 64 bit vectors that are configured into
 # target_vector in targets.c if configured with --enable-targets=all
@@ -743,7 +750,7 @@ all diststuff: info
 # BFD_MACHINES	Architecture-specific routines the configured targets need.
 # COREFILE	Core file routines for a native configuration
 # bfd64_libs	Routines for 64bit support
-OFILES = $(BFD_BACKENDS) $(BFD_MACHINES) @COREFILE@ @bfd64_libs@
+OFILES = $(BFD_BACKENDS) $(BFD_MACHINES) @COREFILE@ @bfd64_libs@ $(PDB_OBJS)
 
 stamp-ofiles: Makefile
 	rm -f tofiles
@@ -764,7 +771,7 @@ ofiles: stamp-ofiles ; @true
 # libbfd_la_SOURCES, we put BFD64_LIBS in OFILES instead.
 # However, list all sources in EXTRA_libbfd_la_SOURCES so the
 # dependency tracking fragments are picked up in the Makefile.
-libbfd_la_SOURCES = $(BFD32_LIBS_CFILES)
+libbfd_la_SOURCES = $(BFD32_LIBS_CFILES) $(PDB_CXXFILES)
 EXTRA_libbfd_la_SOURCES = $(CFILES)
 libbfd_la_DEPENDENCIES = $(OFILES) ofiles
 libbfd_la_LIBADD = `cat ofiles` @SHARED_LIBADD@ $(LIBDL) $(ZLIB)
@@ -902,7 +909,8 @@ $(BFD32_LIBS) \
  $(ALL_MACHINES) \
  $(BFD32_BACKENDS) \
  $(BFD64_BACKENDS) \
- $(OPTIONAL_BACKENDS): $(BFD_H) $(BFD_H_DEPS) $(LOCAL_H_DEPS)
+ $(OPTIONAL_BACKENDS) \
+ $(PDB_OBJS): $(BFD_H) $(BFD_H_DEPS) $(LOCAL_H_DEPS)
 
 host-aout.lo: Makefile
 

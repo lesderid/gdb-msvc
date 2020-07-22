@@ -36,6 +36,7 @@ dnl configure option --enable-shared.
 AC_DISABLE_SHARED
 
 AC_PROG_CC
+AC_PROG_CXX
 AC_GNU_SOURCE
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -405,7 +406,7 @@ tb=
 elf="elf.lo elflink.lo elf-attrs.lo elf-strtab.lo elf-eh-frame.lo
      dwarf1.lo dwarf2.lo"
 coffgen="coffgen.lo dwarf2.lo"
-coff="cofflink.lo $coffgen pdb.lo"
+coff="cofflink.lo $coffgen"
 ecoff="ecofflink.lo $coffgen"
 xcoff="xcofflink.lo $coffgen"
 
@@ -1125,6 +1126,10 @@ AC_SUBST(docdir)
 AC_SUBST(htmldir)
 AC_SUBST(pdfdir)
 
-PKG_CHECK_MODULES([DEPS], [r_bin r_util])
+AC_CHECK_PROG(LLVM_CONFIG_FOUND, llvm-config, yes)
+AS_IF([test x"$LLVM_CONFIG_FOUND" != x"yes"], [AC_MSG_ERROR([Please make sure llvm-config is in your PATH.])])
+AC_SUBST([LLVM_CXXFLAGS], [$(llvm-config --cxxflags)])
+AC_SUBST([LLVM_LDFLAGS], [$(llvm-config --ldflags)])
+AC_SUBST([LLVM_LIBS], [$(llvm-config --libs)])
 
 AC_OUTPUT

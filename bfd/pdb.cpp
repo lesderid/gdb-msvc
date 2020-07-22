@@ -1,21 +1,11 @@
 /* PDB support for BFD. */
 
-/* Includes code from radare2:
-   radare - LGPL - Copyright 2014 - inisider
-   (https://github.com/radareorg/radare2)  */
-
 #include "pdb.h"
 
 /* Called when the BFD is being closed to do any necessary cleanup.  */
 bfd_boolean
 bfd_pdb_close_and_cleanup (bfd *abfd)
 {
-  if (abfd->tdata.pdb_data
-      && abfd->tdata.pdb_data->pdb
-      && abfd->tdata.pdb_data->pdb->finish_pdb_parse)
-    {
-      abfd->tdata.pdb_data->pdb->finish_pdb_parse (abfd->tdata.pdb_data->pdb);
-    }
   return TRUE;
 }
 
@@ -91,87 +81,15 @@ bfd_pdb_find_nearest_line (bfd *abfd,
 #define bfd_pdb_read_minisymbols _bfd_nosymbols_read_minisymbols
 #define bfd_pdb_minisymbol_to_symbol _bfd_nosymbols_minisymbol_to_symbol
 
-static st64
-r_buffer_read (RBuffer *buffer, ut8 *out, ut64 length)
-{
-  bfd *abfd = buffer->priv;
-  return abfd->iovec->bread (abfd, out, length);
-}
-
-static st64
-r_buffer_seek (RBuffer *buffer, st64 address, int whence)
-{
-  bfd *abfd = buffer->priv;
-  return abfd->iovec->bseek (abfd, address, whence);
-}
-
-static bool
-r_buffer_fini(RBuffer *buffer)
-{
-  //if we return TRUE, radare2 will try calling free on our bfd_alloc'ed buffer
-  return FALSE;
-}
-
 static bfd_pdb_data_struct *
 get_bfd_pdb_data (bfd *abfd)
 {
-  RBufferMethods *buffer_methods = bfd_zalloc (abfd, sizeof (RBufferMethods));
-  buffer_methods->read = &r_buffer_read;
-  buffer_methods->seek = &r_buffer_seek;
-  buffer_methods->fini = &r_buffer_fini;
-
-  RBuffer *r_buffer = bfd_zalloc (abfd, sizeof (RBuffer));
-  r_buffer->methods = buffer_methods;
-  r_buffer->priv = abfd;
-  r_buffer->readonly = TRUE;
-
-  R_PDB *pdb = bfd_zalloc (abfd, sizeof (R_PDB));
-  if (init_pdb_parser_with_buf (pdb, r_buffer))
-    {
-      bfd_pdb_data_struct *result = bfd_alloc (abfd, sizeof (bfd_pdb_data_struct));
-      result->pdb = pdb;
-      return result;
-    }
-
   return NULL;
 }
 
 void
 bfd_pdb_get_sections (bfd *abfd)
 {
-  R_PDB *r_pdb = abfd->tdata.pdb_data->pdb;
-
-  SPEStream *section_stream = NULL;
-
-  RListIter *it = r_list_iterator (r_pdb->pdb_streams2);
-  while (r_list_iter_next (it))
-    {
-      SStreamParseFunc *stream = r_list_iter_get (it);
-      if (stream->type == ePDB_STREAM_SECT_HDR)
-        section_stream = stream->stream;
-    }
-
-  if (!section_stream)
-    {
-      _bfd_error_handler (_("%pB: no sections found in PDB"), abfd);
-      return;
-    }
-
-  it = r_list_iterator (section_stream->sections_hdrs);
-  while (r_list_iter_next (it))
-    {
-      SIMAGE_SECTION_HEADER *section_header = r_list_iter_get (it);
-      if (section_header)
-        {
-          //FIXME: These flags are probably not correct
-          asection *section = bfd_make_section_with_flags (abfd,
-                                                           section_header->name,
-                                                           SEC_LOAD);
-          section->vma = section_header->virtual_address;
-          section->size = section_header->size_of_raw_data;
-          //section->userdata = section_header;
-        }
-    }
 }
 
 const bfd_target *
@@ -179,15 +97,8 @@ bfd_pdb_check_format (bfd *abfd)
 {
   if ((abfd->tdata.pdb_data = get_bfd_pdb_data (abfd)))
     {
-      R_PDB *r_pdb = abfd->tdata.pdb_data->pdb;
-
-      if (r_pdb->pdb_parse (r_pdb))
+      if (true)
         {
-          bfd_pdb_get_sections (abfd);
-        }
-      else
-        {
-          _bfd_error_handler (_("%pB: malformed PDB file"), abfd);
           goto fail;
         }
 
@@ -199,6 +110,7 @@ bfd_pdb_check_format (bfd *abfd)
   return NULL;
 }
 
+extern "C"
 const bfd_target pdb_vec =
   {
     "pdb",      /* Name.  */
