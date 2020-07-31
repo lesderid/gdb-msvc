@@ -28,7 +28,7 @@ char* msvc_demangle(const char* sym, int options)
     flags = llvm::MSDemangleFlags(flags | llvm::MSDF_NoReturnType);
   }
 
-#if LLVM_VERSION_MAJOR > 10 || LLVM_VERSION_MAJOR == 10 && (LLVM_VERSION_MINOR > 0 || LLVM_VERSION_PATCH > 0)
+#if LLVM_VERSION_MAJOR > 10
   auto demangled = llvm::microsoftDemangle(mangled, nullptr, nullptr, nullptr, nullptr, flags);
 #else
   auto demangled = llvm::microsoftDemangle(mangled, nullptr, nullptr, nullptr, flags);

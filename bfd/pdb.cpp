@@ -2,6 +2,11 @@
 
 #include "pdb.h"
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedLocalVariable"
+#pragma ide diagnostic ignored "UnusedMacroInspection"
+#pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
+
 /* Called when the BFD is being closed to do any necessary cleanup.  */
 bfd_boolean
 bfd_pdb_close_and_cleanup (bfd *abfd)
@@ -81,34 +86,171 @@ bfd_pdb_find_nearest_line (bfd *abfd,
 #define bfd_pdb_read_minisymbols _bfd_nosymbols_read_minisymbols
 #define bfd_pdb_minisymbol_to_symbol _bfd_nosymbols_minisymbol_to_symbol
 
+#pragma clang diagnostic pop
+
+class BfdByteStream;
+
 static bfd_pdb_data_struct *
 get_bfd_pdb_data (bfd *abfd)
 {
-  return NULL;
+  //TODO: check file magic
+
+  auto allocator = std::make_unique<llvm::BumpPtrAllocator> ();
+
+  auto stream = std::make_unique<BfdByteStream> (abfd);
+  auto pdbFile = std::make_unique<llvm::pdb::PDBFile> (abfd->filename, std::move (stream), *allocator);
+
+  //TODO: proper error handling, only if magic says we're actually reading a PDB file
+  auto ec = pdbFile->parseFileHeaders ();
+  if (ec)
+    {
+      //printf ("%s: error: %s\n", abfd->filename, toString (std::move (ec)).c_str ());
+      return nullptr;
+    }
+
+  ec = pdbFile->parseStreamData ();
+  if (ec)
+    {
+      //printf ("%s: error: %s\n", abfd->filename, toString (std::move (ec)).c_str ());
+      return nullptr;
+    }
+
+  auto session = std::make_unique<llvm::pdb::NativeSession> (std::move (pdbFile),
+                                                             std::move (allocator));
+
+  auto resultBuffer = bfd_alloc (abfd, sizeof (bfd_pdb_data_struct));
+  auto result = new (resultBuffer) bfd_pdb_data_struct;
+  result->session = std::move (session);
+  return result;
 }
 
-void
+bool
 bfd_pdb_get_sections (bfd *abfd)
 {
+  auto & session = abfd->tdata.pdb_data->session;
+  auto & pdbFile = session->getPDBFile ();
+
+  auto dbi = pdbFile.getPDBDbiStream ();
+  auto streamIndex = dbi->getDebugStreamIndex (llvm::pdb::DbgHeaderType::SectionHdr);
+  auto stream = pdbFile.createIndexedStream (streamIndex);
+
+  llvm::ArrayRef<llvm::object::coff_section> headers;
+  auto headerCount = stream->getLength () / sizeof (llvm::object::coff_section);
+  llvm::BinaryStreamReader reader (*stream);
+  if(reader.readArray (headers, headerCount))
+    {
+      return false;
+    }
+
+  for (auto & header: headers)
+    {
+      asection *section = bfd_make_section_with_flags (abfd,
+                                                       header.Name,
+                                                       SEC_LOAD);
+      section->vma = header.VirtualAddress;
+      section->size = header.VirtualSize;
+      //section->userdata = header;
+    }
+
+    return true;
 }
+
+class BfdByteStream : public llvm::BinaryStream {
+ public:
+  explicit BfdByteStream (bfd *abfd) : abfd (abfd)
+  {
+  }
+
+  llvm::support::endianness getEndian () const override
+  {
+    return llvm::support::little;
+  }
+
+  llvm::Error readBytes (uint32_t Offset, uint32_t Size, llvm::ArrayRef<uint8_t> & Buffer) override
+  {
+    //We need to cache the whole PDB file in memory:
+    //During parsing, the LLVM functions first read one block of PDB data into an ArrayRef. They
+    //then just assume all blocks are stored contiguously in memory and simply change the `size`
+    //field of the ArrayRef instead of actually reading the remaining blocks...
+
+    if (!cached)
+      {
+        auto ec = this->createCache ();
+        if (ec) return ec;
+      }
+
+    //printf ("%s: readBytes(offset=%d,size=%d)\n", abfd->filename, Offset, Size);
+
+    Buffer = llvm::ArrayRef<uint8_t> (cache + Offset, (size_t) Size);
+    return llvm::Error::success ();
+  }
+
+  llvm::Error
+  readLongestContiguousChunk (uint32_t Offset, llvm::ArrayRef<uint8_t> & Buffer) override
+  {
+    return readBytes (Offset, getLength () - Offset, Buffer);
+  }
+
+  uint32_t getLength () override
+  {
+    if (fileSize != -1)
+      return fileSize;
+
+    struct stat stat{};
+    if (bfd_stat (abfd, &stat) < 0)
+      return -1;
+
+    fileSize = stat.st_size;
+
+    //printf("stat.st_size=%ld\n", stat.st_size);
+    return fileSize;
+  }
+
+ private:
+  llvm::Error
+  createCache ()
+  {
+    if (cached) return llvm::Error::success ();
+
+    auto length = getLength ();
+
+    cache = static_cast<uint8_t *>(bfd_alloc (abfd, length));
+    if (bfd_seek (abfd, 0, SEEK_SET) != 0)
+      return llvm::createStringError (std::error_code (), "EOF");
+    if (bfd_bread (cache, length, abfd) != length)
+      return llvm::createStringError (std::error_code (), "EOF");
+
+    cached = true;
+
+    return llvm::Error::success ();
+  }
+
+  bfd *abfd;
+  bool cached = false;
+  uint8_t *cache = nullptr;
+  size_t fileSize = -1;
+};
 
 const bfd_target *
 bfd_pdb_check_format (bfd *abfd)
 {
   if ((abfd->tdata.pdb_data = get_bfd_pdb_data (abfd)))
     {
-      if (true)
-        {
-          goto fail;
-        }
+      auto & pdbData = abfd->tdata.pdb_data;
+
+      if (!bfd_pdb_get_sections (abfd))
+        goto fail;
 
       return abfd->xvec;
     }
 
   fail:
   bfd_set_error (bfd_error_wrong_format);
-  return NULL;
+  return nullptr;
 }
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 
 extern "C"
 const bfd_target pdb_vec =
@@ -166,7 +308,9 @@ const bfd_target pdb_vec =
     BFD_JUMP_TABLE_LINK (_bfd_nolink),
     BFD_JUMP_TABLE_DYNAMIC (_bfd_nodynamic),
 
-    NULL,
+    nullptr,
 
-    NULL
+    nullptr
   };
+
+#pragma clang diagnostic pop
