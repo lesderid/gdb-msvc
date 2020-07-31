@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: CI
 
 on: [push, pull_request]
 
@@ -52,4 +52,7 @@ jobs:
 
       - name: Install
         working-directory: build
-        run: make install
+        run: sudo make install
+
+      - name: Print version
+        run: i686-w64-mingw32-gdb --version
