@@ -1,15 +1,19 @@
 # gdb-msvc
 
-gdb-msvc is a series of patches for GDB (and bfd) for easier debugging of Microsoft Visual C++ (MSVC) binaries.
+![CI](https://github.com/lesderid/gdb-msvc/workflows/CI/badge.svg)
+
+gdb-msvc is a series of patches for GDB (and its dependencies) for easier debugging of Microsoft Visual C++ (MSVC) binaries.
 
 ## Main features
 
 The main features in this patchset are:
 
-* MSVC demangling support (using [LLVM](https://llvm.org/))
-* PDB debug symbol loading (using [radare2](https://github.com/radareorg/radare2)'s libr)
+* MSVC demangling support
+* PDB debug symbol loading
 
-(Note: we can't currently use LLVM for PDB loading as LLVM doesn't yet expose its PDB functions as a C API and bfd is written in C, not C++.)
+These features are implemented using libraries from [LLVM](https://llvm.org/).
+
+**NOTE:** Currently, PDB symbol loading uses [radare2](https://github.com/radareorg/radare2)'s libr. This is being removed in favour of a better implementation that uses LLVM.
 
 ## Building
 
