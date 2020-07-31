@@ -1615,7 +1615,7 @@ Optional Packages:
   --with-libunwind-ia64   use libunwind frame unwinding for ia64 targets
   --with-curses           use the curses library instead of the termcap
                           library
-  --with-pkgversion=PKG   Use PKG in the version string in place of "GDB"
+  --with-pkgversion=PKG   Use PKG in the version string in place of "gdb-msvc"
   --with-bugurl=URL       Direct users to URL to report a bug
   --with-system-zlib      use installed libz
   --with-gnu-ld           assume the C compiler uses GNU ld default=no
@@ -7075,7 +7075,7 @@ if test "${with_pkgversion+set}" = set; then :
       *)   PKGVERSION="($withval) " ;;
      esac
 else
-  PKGVERSION="(GDB) "
+  PKGVERSION="(gdb-msvc) "
 
 fi
 

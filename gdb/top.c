@@ -1366,6 +1366,8 @@ print_gdb_version (struct ui_file *stream, bool interactive)
 
   fprintf_filtered (stream,
 		    "Copyright (C) 2020 Free Software Foundation, Inc.\n");
+  fprintf_filtered (stream,
+		    "Copyright (C) 2020 Les De Ridder (MSVC patches) <https://lesderid.net>\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
