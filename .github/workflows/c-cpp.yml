@@ -7,27 +7,49 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-    - uses: actions/checkout@v2
+      - name: Install radare2 dependencies
+        run: sudo apt install patch unzip git gcc make curl pkg-config xz-utils
 
-    - name: Install dependencies
-      run: sudo apt install libreadline-dev libradare2-dev llvm-dev
+      - name: Checkout radare2
+        uses: actions/checkout@v2
+        with:
+          path: radare2
+          repository: radareorg/radare2
+          ref: 4.5.0
 
-    - name: Create build directory
-      run: mkdir build
+      - name: Build radare2
+        working-directory: radare2
+        run: |
+          sys/debian.sh
+          mv radare2_*_amd64.deb radare2_amd64.deb
+          mv radare2-dev_*_amd64.deb radare2-dev_amd64.deb
 
-    - name: Configure
-      working-directory: build
-      run: >-
-        ../configure
-        --prefix=/usr
-        --target=i686-w64-mingw32
-        --with-system-readline
-        --disable-nls
+      - name: Install radare2
+        working-directory: radare2
+        run: sudo apt install ./radare2*.deb
 
-    - name: Build
-      working-directory: build
-      run: make
+      - name: Checkout gdb-msvc
+        uses: actions/checkout@v2
 
-    - name: Install
-      working-directory: build
-      run: make install
+      - name: Install dependencies
+        run: sudo apt install libreadline-dev llvm-dev
+
+      - name: Create build directory
+        run: mkdir build
+
+      - name: Configure
+        working-directory: build
+        run: >-
+          ../configure
+          --prefix=/usr
+          --target=i686-w64-mingw32
+          --with-system-readline
+          --disable-nls
+
+      - name: Build
+        working-directory: build
+        run: make
+
+      - name: Install
+        working-directory: build
+        run: make install
