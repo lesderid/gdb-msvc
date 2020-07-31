@@ -1,0 +1,33 @@
+name: C/C++ CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: sudo apt install libreadline-dev libradare2-dev llvm-dev
+
+    - name: Create build directory
+      run: mkdir build
+
+    - name: Configure
+      working-directory: build
+      run: >-
+        ../configure
+        --prefix=/usr
+        --target=i686-w64-mingw32
+        --with-system-readline
+        --disable-nls
+
+    - name: Build
+      working-directory: build
+      run: make
+
+    - name: Install
+      working-directory: build
+      run: make install
