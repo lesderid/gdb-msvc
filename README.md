@@ -4,9 +4,9 @@
 
 gdb-msvc is a series of patches for GDB (and its dependencies) for easier debugging of Microsoft Visual C++ (MSVC) binaries.
 
-## Main features
+## Features
 
-The main features in this patchset are:
+The main features of this patchset are:
 
 * MSVC demangling support
 * PDB debug symbol loading

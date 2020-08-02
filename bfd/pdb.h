@@ -13,7 +13,6 @@
 #include <llvm/Support/Allocator.h>
 #include <llvm/DebugInfo/PDB/Native/PDBFile.h>
 #include <llvm/DebugInfo/PDB/Native/DbiStream.h>
-#include <llvm/DebugInfo/PDB/Native/NativeSession.h>
 #include <llvm/DebugInfo/PDB/Native/PublicsStream.h>
 #include <llvm/DebugInfo/PDB/Native/GlobalsStream.h>
 #include <llvm/DebugInfo/PDB/Native/SymbolStream.h>
@@ -26,9 +25,12 @@
 #include <llvm/DebugInfo/CodeView/CVSymbolVisitor.h>
 #include <llvm/Object/COFF.h>
 
-using namespace llvm::codeview;
-
 typedef struct pdb_data_struct {
-    std::unique_ptr<llvm::pdb::PDBFile> llvmPdbFile;
+  std::unique_ptr<llvm::pdb::PDBFile> llvmPdbFile;
 } bfd_pdb_data_struct;
 
+const llvm::object::coff_section &
+bfd_pdb_get_llvm_section_header (asection *section);
+
+llvm::pdb::PDBFile &
+bfd_pdb_get_llvm_pdb_file (bfd *abfd);

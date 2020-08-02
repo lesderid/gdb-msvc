@@ -376,41 +376,23 @@ read_pdb (struct objfile *objfile, minimal_symbol_reader & reader)
 static void
 pdb_sym_new_init (objfile *objfile)
 {
-  //printf ("%s\n", __func__);
 }
 
 static void
 pdb_sym_init (objfile *objfile)
 {
-  //printf ("%s\n", __func__);
 }
 
 static void
 pdb_sym_read (objfile *objfile, symfile_add_flags symfile_flags)
 {
   gdb::def_vector<asymbol *> symbol_table;
-  long storage_needed, number_of_symbols;
-
-  //printf ("%s\n", __func__);
 
   bfd *abfd = objfile->obfd;
 
-  storage_needed = bfd_get_symtab_upper_bound(abfd);
-  if (storage_needed < 0)
-    goto fail;
-  symbol_table.resize (storage_needed);
-
-  number_of_symbols = bfd_canonicalize_symtab(abfd, symbol_table.data ());
-  if (number_of_symbols < 0)
-    goto fail;
-
-  printf ("got %ld symbols from bfd\n", number_of_symbols);
-  for (auto i = 0; i < number_of_symbols; i++)
-    {
-      auto& symbol = symbol_table[i];
-      auto vma = symbol->section->vma + symbol->value;
-      //printf ("symbol %d: name=%s, vma=%lX\n", i, symbol->name, vma);
-    }
+  auto& pdbFile = bfd_pdb_get_llvm_pdb_file(abfd);
+  (void) pdbFile;
+  //TODO: load symbols
   return;
 
   fail:
@@ -422,7 +404,6 @@ pdb_sym_read (objfile *objfile, symfile_add_flags symfile_flags)
 static void
 pdb_sym_finish (objfile *objfile)
 {
-  //printf ("%s\n", __func__);
 }
 
 const struct sym_fns pdb_sym_fns = {
