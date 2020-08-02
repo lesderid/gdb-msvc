@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <llvm/Object/COFF.h>
 #include <llvm/DebugInfo/PDB/Native/PDBFile.h>
 #undef __STDC_CONSTANT_MACROS
