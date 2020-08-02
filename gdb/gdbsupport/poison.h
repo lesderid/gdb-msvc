@@ -52,10 +52,6 @@ struct IsMemsettable
 	    std::is_pod<T>>
 {};
 
-template <typename T,
-	  typename = gdb::Requires<gdb::Not<IsMemsettable<T>>>>
-void *memset (T *s, int c, size_t n) = delete;
-
 #if HAVE_IS_TRIVIALLY_COPYABLE
 
 /* Similarly, poison memcpy and memmove of non trivially-copyable
@@ -97,9 +93,6 @@ using IsMallocable = std::true_type;
 
 template<typename T>
 using IsFreeable = gdb::Or<std::is_trivially_destructible<T>, std::is_void<T>>;
-
-template <typename T, typename = gdb::Requires<gdb::Not<IsFreeable<T>>>>
-void free (T *ptr) = delete;
 
 template<typename T>
 static T *

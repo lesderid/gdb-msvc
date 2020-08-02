@@ -1,11 +1,10 @@
-#include "config.h"
+#include "defs.h"
 
 #include <llvm/Object/COFF.h>
 #include <llvm/DebugInfo/PDB/Native/PDBFile.h>
 #undef __STDC_CONSTANT_MACROS
 #undef __STDC_LIMIT_MACROS
 
-#include "defs.h"
 #include "symtab.h"
 #include "minsyms.h"
 #include "gdb_bfd.h"
