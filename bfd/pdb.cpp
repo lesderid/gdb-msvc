@@ -1,11 +1,11 @@
-/* PDB support for BFD. */
-
 #include "pdb.h"
 
-#pragma clang diagnostic push
+/* PDB support for BFD. */
+
 #pragma ide diagnostic ignored "UnusedLocalVariable"
 #pragma ide diagnostic ignored "UnusedMacroInspection"
 #pragma ide diagnostic ignored "UnusedGlobalDeclarationInspection"
+#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 
 /* Called when the BFD is being closed to do any necessary cleanup.  */
 bfd_boolean
@@ -31,12 +31,93 @@ bfd_pdb_bfd_free_cached_info (bfd *abfd)
 long
 bfd_pdb_get_symtab_upper_bound (bfd *abfd)
 {
-  return -1;
+  auto & pdbFile = abfd->tdata.pdb_data->llvmPdbFile;
+
+  llvm::ExitOnError err ("Error getting symbol stream: ");
+  auto & symbolStream = err (pdbFile->getPDBSymbolStream ());
+  auto & symbols = symbolStream.getSymbolArray ();
+
+  long count = 0;
+  for (auto iter = symbols.begin (); iter != symbols.end (); iter++)
+    count++;
+
+  return (count + 1) * (long) (sizeof (asymbol *));
 }
+
+class BfdPdbSymbolFactory : public SymbolVisitorCallbacks {
+ public:
+  BfdPdbSymbolFactory (bfd *abfd, asymbol **alocation) : abfd (abfd), symbols (alocation)
+  {
+  }
+
+  llvm::Error visitKnownRecord (CVSymbol & CVR, PublicSym32 & Record) override
+  {
+    auto symbol = symbols[symbolsCreated++] = bfd_make_empty_symbol(abfd);
+
+    auto name = (char *) bfd_alloc (abfd, Record.Name.size ());
+    strcpy (name, Record.Name.str ().c_str ());
+    symbol->name = name;
+
+    auto & section = abfd->sections[Record.Segment - 1]; //TODO
+    symbol->section = &section;
+
+    symbol->value = Record.Offset;
+
+    //TODO: turn this into a separate function?
+    if (static_cast<int>(Record.Flags & PublicSymFlags::Function))
+      {
+        symbol->flags |= BSF_FUNCTION;
+      }
+
+    return SymbolVisitorCallbacks::visitKnownRecord (CVR, Record);
+  }
+
+  llvm::Error visitKnownRecord (CVSymbol & CVR, DataSym & Record) override
+  {
+    //printRecord (Record);
+    return SymbolVisitorCallbacks::visitKnownRecord (CVR, Record);
+  }
+
+  long getSymbolsCreated () const
+  {
+    return symbolsCreated;
+  }
+
+  template<typename T>
+  void printRecord (T & symRecord)
+  {
+    printf ("sym record: name=%s, kind=%hu, record=%s\n",
+            symRecord.Name.str ().c_str (),
+            symRecord.getKind (),
+            typeid (symRecord).name ());
+  }
+ private:
+  bfd *abfd;
+  asymbol **symbols;
+  long symbolsCreated = 0;
+};
 
 long
 bfd_pdb_canonicalize_symtab (bfd *abfd, asymbol **alocation)
 {
+  auto & pdbFile = abfd->tdata.pdb_data->llvmPdbFile;
+
+  llvm::ExitOnError err ("Error getting symbol stream: ");
+  auto & symbolStream = err (pdbFile->getPDBSymbolStream ());
+  auto & symbols = symbolStream.getSymbolArray ();
+
+  SymbolVisitorCallbackPipeline pipeline;
+  SymbolDeserializer deserializer (nullptr, CodeViewContainer::Pdb);
+  BfdPdbSymbolFactory factory (abfd, alocation);
+  pipeline.addCallbackToPipeline (deserializer);
+  pipeline.addCallbackToPipeline (factory);
+  CVSymbolVisitor visitor (pipeline);
+  if (auto ec = visitor.visitSymbolStream (symbols))
+    {
+      printf ("%s: error: %s\n", abfd->filename, toString (std::move (ec)).c_str ());
+    }
+
+  //return factory.getSymbolsCreated ();
   return -1;
 }
 
@@ -86,8 +167,6 @@ bfd_pdb_find_nearest_line (bfd *abfd,
 #define bfd_pdb_read_minisymbols _bfd_nosymbols_read_minisymbols
 #define bfd_pdb_minisymbol_to_symbol _bfd_nosymbols_minisymbol_to_symbol
 
-#pragma clang diagnostic pop
-
 class BfdByteStream;
 
 static bfd_pdb_data_struct *
@@ -111,48 +190,48 @@ get_bfd_pdb_data (bfd *abfd)
   ec = pdbFile->parseStreamData ();
   if (ec)
     {
-      //printf ("%s: error: %s\n", abfd->filename, toString (std::move (ec)).c_str ());
+      printf ("%s: error: %s\n", abfd->filename, toString (std::move (ec)).c_str ());
       return nullptr;
     }
 
-  auto session = std::make_unique<llvm::pdb::NativeSession> (std::move (pdbFile),
-                                                             std::move (allocator));
-
   auto resultBuffer = bfd_alloc (abfd, sizeof (bfd_pdb_data_struct));
   auto result = new (resultBuffer) bfd_pdb_data_struct;
-  result->session = std::move (session);
+  result->llvmPdbFile = std::move (pdbFile);
   return result;
 }
 
 bool
 bfd_pdb_get_sections (bfd *abfd)
 {
-  auto & session = abfd->tdata.pdb_data->session;
-  auto & pdbFile = session->getPDBFile ();
+  auto & pdbFile = abfd->tdata.pdb_data->llvmPdbFile;
 
-  auto dbi = pdbFile.getPDBDbiStream ();
+  auto dbi = pdbFile->getPDBDbiStream ();
   auto streamIndex = dbi->getDebugStreamIndex (llvm::pdb::DbgHeaderType::SectionHdr);
-  auto stream = pdbFile.createIndexedStream (streamIndex);
+  auto stream = pdbFile->createIndexedStream (streamIndex);
 
   llvm::ArrayRef<llvm::object::coff_section> headers;
   auto headerCount = stream->getLength () / sizeof (llvm::object::coff_section);
   llvm::BinaryStreamReader reader (*stream);
-  if(reader.readArray (headers, headerCount))
+  if (reader.readArray (headers, headerCount))
     {
       return false;
     }
 
   for (auto & header: headers)
     {
+      auto headerCopyBuffer = bfd_alloc (abfd,
+                                         sizeof (llvm::object::coff_section));
+      auto headerCopy = new (headerCopyBuffer) llvm::object::coff_section (header);
+
       asection *section = bfd_make_section_with_flags (abfd,
-                                                       header.Name,
+                                                       headerCopy->Name,
                                                        SEC_LOAD);
-      section->vma = header.VirtualAddress;
-      section->size = header.VirtualSize;
-      //section->userdata = header;
+      section->vma = headerCopy->VirtualAddress;
+      section->size = headerCopy->VirtualSize;
+      section->used_by_bfd = headerCopy;
     }
 
-    return true;
+  return true;
 }
 
 class BfdByteStream : public llvm::BinaryStream {
@@ -179,8 +258,6 @@ class BfdByteStream : public llvm::BinaryStream {
         if (ec) return ec;
       }
 
-    //printf ("%s: readBytes(offset=%d,size=%d)\n", abfd->filename, Offset, Size);
-
     Buffer = llvm::ArrayRef<uint8_t> (cache + Offset, (size_t) Size);
     return llvm::Error::success ();
   }
@@ -200,10 +277,7 @@ class BfdByteStream : public llvm::BinaryStream {
     if (bfd_stat (abfd, &stat) < 0)
       return -1;
 
-    fileSize = stat.st_size;
-
-    //printf("stat.st_size=%ld\n", stat.st_size);
-    return fileSize;
+    return fileSize = stat.st_size;
   }
 
  private:
@@ -248,9 +322,6 @@ bfd_pdb_check_format (bfd *abfd)
   bfd_set_error (bfd_error_wrong_format);
   return nullptr;
 }
-
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "hicpp-signed-bitwise"
 
 extern "C"
 const bfd_target pdb_vec =
@@ -312,5 +383,3 @@ const bfd_target pdb_vec =
 
     nullptr
   };
-
-#pragma clang diagnostic pop
