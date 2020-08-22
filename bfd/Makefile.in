@@ -1316,7 +1316,7 @@ SOURCE_HFILES = \
 	version.h vms.h \
 	wasm-module.h \
 	xcofflink.h xsym.h \
-	pdb.h pdb-types.h
+	pdb.h
 
 BUILD_HFILES = \
 	bfdver.h elf32-target.h elf64-target.h targmatch.h bfd_stdint.h

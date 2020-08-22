@@ -719,7 +719,7 @@ SOURCE_HFILES = \
 	version.h vms.h \
 	wasm-module.h \
 	xcofflink.h xsym.h \
-	pdb.h pdb-types.h
+	pdb.h
 
 ## ... and .h files which are in the build tree, minus config.h and bfd.h
 BUILD_HFILES = \

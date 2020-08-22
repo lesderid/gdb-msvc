@@ -13,8 +13,6 @@ The main features of this patchset are:
 
 These features are implemented using libraries from [LLVM](https://llvm.org/).
 
-**NOTE:** Currently, PDB symbol loading uses [radare2](https://github.com/radareorg/radare2)'s libr. This is being removed in favour of a better implementation that uses LLVM.
-
 ## Building
 
 * `mkdir build && cd build`
