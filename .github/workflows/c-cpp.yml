@@ -15,7 +15,7 @@ jobs:
         with:
           path: radare2
           repository: radareorg/radare2
-          ref: 4.5.0
+          ref: 5.0.0
 
       - name: Build radare2
         working-directory: radare2

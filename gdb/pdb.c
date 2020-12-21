@@ -74,14 +74,14 @@ section_by_name (const char *name, struct objfile *objfile)
   return sect;
 }
 
-static std::unique_ptr<R_PDB>
+static std::unique_ptr<RPdb>
 get_r_pdb (const std::string & path)
 {
-  R_PDB pdb = {nullptr};
+  RPdb pdb = {nullptr};
   if (std::ifstream (path).good ())
     {
       if (init_pdb_parser (&pdb, path.c_str ()))
-        return std::make_unique<R_PDB> (pdb);
+        return std::make_unique<RPdb> (pdb);
     }
   else if (path.rfind ("target:", 0) == 0)
     {
@@ -149,7 +149,7 @@ get_r_pdb (const std::string & path)
       if (init_pdb_parser_with_buf (&pdb, r_buffer))
         {
           xfree (buffer);
-          return std::make_unique<R_PDB> (pdb);
+          return std::make_unique<RPdb> (pdb);
         }
 
       xfree (buffer);
@@ -242,7 +242,7 @@ get_pdb_paths (struct objfile *objfile)
   return paths;
 }
 
-static std::tuple<std::unique_ptr<R_PDB>, std::string>
+static std::tuple<std::unique_ptr<RPdb>, std::string>
 load_pdb (objfile *objfile)
 {
   auto paths = get_pdb_paths (objfile);
@@ -288,7 +288,7 @@ try_load_pdb_bfd (objfile *objfile)
 void
 read_pdb (struct objfile *objfile, minimal_symbol_reader & reader)
 {
-  std::unique_ptr<R_PDB> pdb;
+  std::unique_ptr<RPdb> pdb;
   std::string pdb_path;
   std::tie (pdb, pdb_path) = load_pdb (objfile);
 
